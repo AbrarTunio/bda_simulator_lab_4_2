@@ -1,0 +1,561 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Spark, three ways: RDDs, DataFrames, plans and skewed joins</title>
+<meta name="description" content="A beginner explanation and a command-by-command simulator for the Processing Data with Spark RDDs and DataFrames lab.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚡</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Ubuntu:ital,wght@0,300;0,400;0,500;0,700;1,400&family=Ubuntu+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<style>
+:root{
+  --bg:#FFF8F1; --surface:#FFFFFF; --ink:#1A1033; --muted:#5E5873; --rule:#EADFD6;
+  --spark:#FF5A1F; --spark-soft:#FFE7DC; --pink:#E8287A; --pink-soft:#FDE2EE; --violet:#6D28D9; --violet-soft:#EDE4FD;
+  --blue:#2563EB; --blue-soft:#E0EAFE; --cyan:#0891B2; --cyan-soft:#D9F4FA; --lime:#4D7C0F; --lime-soft:#E8F5D2; --amber:#D97706; --amber-soft:#FEF0D2;
+  --ok:#15803D; --ok-soft:#DCFCE7; --danger:#DC2626; --danger-soft:#FEE2E2;
+  --term-bg:#150F2B; --term-fg:#E7E2F4;
+  --bs-body-bg:var(--bg); --bs-body-color:var(--ink); --bs-border-color:var(--rule);
+  --bs-body-font-family:'Ubuntu',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+  --bs-font-monospace:'Ubuntu Mono',ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+html{scroll-behavior:smooth;scroll-padding-top:70px}
+body{line-height:1.6}
+h1,h2,h3{font-weight:700;letter-spacing:-.01em;line-height:1.12}
+h2{font-size:clamp(1.45rem,2.6vw,2rem)} h3{font-size:1.1rem}
+p{max-width:70ch}
+code{color:var(--violet);background:var(--violet-soft);padding:.05em .3em;border-radius:4px;font-size:.98em}
+.muted{color:var(--muted)} .tnum{font-variant-numeric:tabular-nums}
+.btn{font-weight:500;border-radius:999px;padding-left:1rem;padding-right:1rem}
+.btn-hot{background:var(--pink);color:#fff;border:0} .btn-hot:hover,.btn-hot:focus{background:#C81E66;color:#fff}
+.btn-hot:disabled{background:#D9C9D3;color:#fff}
+.btn-soft{background:#fff;color:var(--ink);border:1.5px solid var(--rule)} .btn-soft:hover{border-color:var(--pink);color:var(--pink)}
+.btn:focus-visible{outline:3px solid var(--blue);outline-offset:2px;box-shadow:none}
+.topnav{background:rgba(26,16,51,.96);backdrop-filter:blur(6px)}
+.brand{font-weight:700;color:#fff;text-decoration:none}
+.brand span{color:#FFB38F}
+.topnav .nav-link{color:#D8D0EE;font-weight:500;font-size:.95rem;padding:.35rem .6rem}
+.topnav .nav-link:hover{color:#fff}
+.topnav .nav-link.cta{background:var(--pink);color:#fff;border-radius:999px;padding:.3rem .9rem;margin-left:.3rem}
+
+/* hero: the signature band */
+.hero{background:linear-gradient(115deg,#1A1033 0%,#3B1366 38%,#B0174F 72%,#FF5A1F 100%);color:#fff;padding:3.2rem 0 2.6rem;position:relative;overflow:hidden}
+.hero h1{font-size:clamp(2.1rem,4.8vw,3.6rem);max-width:19ch}
+.hero .lead{color:#F3E8FF;max-width:62ch;font-size:1.15rem}
+.three{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.9rem;margin-top:1.8rem;max-width:1000px}
+.api{border-radius:14px;padding:1rem 1.1rem;background:rgba(255,255,255,.1);border:1.5px solid rgba(255,255,255,.25);backdrop-filter:blur(4px)}
+.api .lbl{font-size:.8rem;letter-spacing:.06em;text-transform:uppercase;color:#FFD3BF;font-weight:700}
+.api b{display:block;font-size:1.3rem;margin:.1rem 0 .4rem}
+.api .bar{height:10px;border-radius:5px;background:rgba(255,255,255,.18);overflow:hidden;margin:.25rem 0}
+.api .bar i{display:block;height:100%;border-radius:5px}
+.api small{color:#EADCF8}
+.api .lines{font-family:'Ubuntu Mono',monospace;font-size:.82rem;color:#fff;opacity:.9}
+
+/* ideas */
+.ideas{display:grid;grid-template-columns:repeat(auto-fill,minmax(310px,1fr));gap:1rem}
+.idea{background:#fff;border-radius:14px;padding:1rem 1.1rem;border:1.5px solid var(--rule);border-top:6px solid var(--c,var(--spark))}
+.idea h3{display:flex;gap:.5rem;align-items:center;margin-bottom:.45rem}
+.idea .num{width:28px;height:28px;border-radius:50%;background:var(--c,var(--spark));color:#fff;display:inline-flex;align-items:center;justify-content:center;font-size:.85rem;flex:0 0 auto}
+.idea p{font-size:.95rem;margin-bottom:.5rem}
+.idea .eg{font-size:.88rem;color:var(--muted);background:var(--cs,var(--spark-soft));border-radius:8px;padding:.4rem .6rem}
+.vis{margin:.4rem 0 .6rem;font-size:.8rem}
+.chain{display:flex;flex-wrap:wrap;gap:.3rem;align-items:center}
+.chain span{border-radius:999px;padding:.15rem .6rem;border:1.5px dashed var(--muted);color:var(--muted);background:#fff}
+.chain span.act{border:0;background:var(--pink);color:#fff;font-weight:700}
+.chain b{color:var(--muted)}
+.nw{display:grid;grid-template-columns:1fr 1fr;gap:.5rem}
+.nw>div{border-radius:10px;padding:.45rem .55rem}
+.nw .n1{background:var(--blue-soft)} .nw .w1{background:var(--pink-soft)}
+.nw .t{font-weight:700;font-size:.82rem}
+.pmini{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;margin-top:.3rem}
+.pmini i{height:14px;border-radius:4px;background:var(--blue)}
+.pmini.w i{background:var(--pink)}
+.gloss{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:.6rem 1.4rem;margin:0}
+.gloss>div{border-top:3px solid var(--c,var(--violet));padding-top:.4rem}
+.gloss dt{font-weight:700} .gloss dd{margin:0;font-size:.92rem}
+
+/* simulator */
+.rail{display:flex;gap:.4rem;overflow-x:auto;padding:.25rem 0 .6rem;scrollbar-width:thin}
+.rail button{flex:0 0 auto;border:1.5px solid var(--rule);background:#fff;border-radius:12px;padding:.35rem .7rem;font-size:.85rem;color:var(--muted);text-align:left;line-height:1.2}
+.rail button b{display:block;font-size:1rem;color:var(--ink)}
+.rail button.cur{border-color:var(--pink);background:var(--pink-soft);color:var(--ink)}
+.rail button.done b::after{content:" ✓";color:var(--ok)}
+.step-head h2{margin-bottom:.25rem;font-size:clamp(1.25rem,2vw,1.6rem)}
+.cmd-list{max-height:min(52vh,560px);overflow:auto;padding-right:4px;scrollbar-width:thin}
+.cmd{border:1.5px solid var(--rule);border-radius:12px;background:#fff;margin-bottom:.6rem;overflow:hidden}
+.cmd.next{border-color:var(--pink);box-shadow:0 0 0 3px var(--pink-soft)} .cmd.done{border-color:#A7E3BA}
+.cmd-top{display:flex;align-items:center;gap:.5rem;padding:.4rem .6rem;border-bottom:1px solid var(--rule);background:#FFFBF7}
+.where{font-size:.72rem;font-weight:700;border-radius:999px;padding:1px 8px;color:#fff;white-space:nowrap}
+.where.sh{background:#3B3355} .where.py{background:var(--spark)}
+.extra{font-size:.68rem;font-weight:700;color:var(--violet);border:1.5px solid var(--violet);border-radius:999px;padding:0 6px;white-space:nowrap}
+.cmd-label{font-size:.84rem;font-weight:500;color:var(--muted);flex:1;min-width:0}
+.cmd pre{margin:0;padding:.55rem .7rem;font-size:.9rem;line-height:1.45;background:#FFFDFB;max-height:240px;overflow:auto;white-space:pre}
+.cmd .run{min-width:92px} .cmd .status{font-size:.78rem;font-weight:700;white-space:nowrap}
+.cmd.done .status{color:var(--ok)}
+.cmd-explain{padding:.6rem .75rem;border-top:1px dashed var(--rule);font-size:.92rem;background:#fff}
+.cmd-explain p{margin:.15rem 0 .4rem}
+.cmd-explain .simple{background:var(--amber-soft);border-radius:8px;padding:.35rem .55rem}
+.cmd-explain .see{color:var(--violet);font-weight:500}
+.cmd-explain .vm{font-size:.8rem;color:var(--muted)}
+.cmd-explain .fix{border-left:4px solid var(--danger);padding:.3rem .6rem;background:var(--danger-soft);border-radius:0 8px 8px 0;font-size:.88rem}
+.step-takeaway{border-radius:14px;padding:.9rem 1.1rem;background:linear-gradient(120deg,var(--violet-soft),var(--pink-soft));margin-top:.75rem;border:0}
+.step-takeaway ul{margin:.25rem 0 0;padding-left:1.1rem} .step-takeaway li{margin:.2rem 0}
+.ff-box{border:1.5px dashed var(--pink);border-radius:12px;padding:.75rem .9rem;margin-bottom:.75rem;background:#fff}
+.term-wrap{border-radius:14px;overflow:hidden;background:var(--term-bg);box-shadow:0 6px 24px rgba(26,16,51,.18)}
+.term-tabs{display:flex;gap:6px;align-items:center;background:#231A42;padding:.4rem .7rem;color:#CFC6EA;font-size:.8rem}
+.term-tabs i{width:10px;height:10px;border-radius:50%;display:inline-block}
+.term-body{height:300px;overflow:auto;padding:.6rem .75rem;margin:0;color:var(--term-fg);font-size:.86rem;line-height:1.4;white-space:pre;font-family:'Ubuntu Mono',ui-monospace,Menlo,Consolas,monospace}
+.term-body .pr{color:#7EE2A8;font-weight:700} .term-body .pa{color:#8CC4FF;font-weight:700} .term-body .py{color:#FFB38F;font-weight:700}
+.term-body .dim{color:#9C93B8} .term-body .err{color:#FF8FA3} .term-body .ok{color:#8EE6A3} .term-body .warn{color:#FFD479} .term-body .hi{color:#FF9EC7;font-weight:700}
+
+.sys{position:sticky;top:64px;max-height:calc(100vh - 76px);overflow:auto;padding-right:2px}
+.statusbar{display:flex;flex-wrap:wrap;gap:.3rem .5rem;align-items:center;background:var(--ink);color:#fff;border-radius:14px;padding:.45rem .7rem;margin-bottom:.6rem;font-size:.8rem}
+.statusbar .svc{border:1px solid #4A3F6B;border-radius:999px;padding:1px 9px;color:#A99FC8}
+.statusbar .svc.on{background:linear-gradient(90deg,var(--spark),var(--pink));color:#fff;border-color:transparent;font-weight:700}
+.zone{border:1.5px solid var(--rule);background:#fff;border-radius:14px;padding:.7rem .8rem;margin-bottom:.6rem;transition:box-shadow .25s,border-color .25s}
+.zone.focus{border-color:var(--pink);box-shadow:0 0 0 4px var(--pink-soft)}
+.zone-h{display:flex;justify-content:space-between;align-items:baseline;gap:.5rem;margin-bottom:.4rem}
+.zone-h b{font-size:.98rem} .zone-h span{font-size:.76rem;color:var(--muted);text-align:right}
+#zLazy .zone-h b{color:var(--violet)} #zStages .zone-h b{color:var(--pink)} #zScore .zone-h b{color:var(--spark)}
+.mini-h{font-size:.8rem;font-weight:700;margin:.15rem 0 .3rem}
+.procs{display:flex;flex-wrap:wrap;gap:.3rem}
+.proc{border-radius:999px;padding:.15rem .6rem;font-size:.76rem;background:var(--blue-soft);color:var(--blue);font-weight:500}
+.proc.sp{background:var(--spark-soft);color:#B53D0C}
+.files{font-family:'Ubuntu Mono',monospace;font-size:.8rem;background:#FFFBF7;border:1px solid var(--rule);border-radius:8px;padding:.35rem .5rem;max-height:120px;overflow:auto;margin-top:.4rem}
+.files .new{background:#FFF1B8;border-radius:3px}
+.none{color:var(--muted);font-size:.84rem;font-style:italic}
+.vars{display:flex;flex-wrap:wrap;gap:.3rem}
+.var{border-radius:8px;padding:.15rem .5rem;font-size:.76rem;border:1.5px dashed var(--muted);color:var(--muted);background:#fff;font-family:'Ubuntu Mono',monospace}
+.var.df{border-color:var(--violet);color:var(--violet)} .var.rdd{border-color:var(--cyan);color:var(--cyan)}
+.var.ran{border-style:solid;background:var(--ok-soft)} .var.cached{background:var(--amber-soft);border-style:solid;border-color:var(--amber);color:#8A4B04}
+.plan{display:flex;flex-wrap:wrap;gap:.3rem;align-items:center;margin-top:.5rem}
+.node{border-radius:10px;padding:.25rem .55rem;font-size:.76rem;border:1.5px dashed #B9AFCF;color:var(--muted);background:#fff;line-height:1.25}
+.node small{display:block;font-size:.66rem}
+.node.on{border-style:solid;background:var(--violet);border-color:var(--violet);color:#fff}
+.node.action{border-style:solid;border-color:var(--pink);color:var(--pink);font-weight:700}
+.node.action.on{background:var(--pink);color:#fff}
+.node.wide{border-color:var(--pink)}
+.plan .ar{color:#B9AFCF}
+.lazy-note{font-size:.8rem;margin-top:.4rem;padding:.35rem .55rem;border-radius:8px;background:var(--violet-soft)}
+.lazy-note.ran{background:var(--ok-soft)}
+.stages{display:flex;align-items:stretch;gap:0;overflow-x:auto;padding-bottom:4px}
+.stage{flex:1 1 0;min-width:150px;border:2px solid var(--blue);border-radius:12px;padding:.4rem .5rem;background:#fff}
+.stage .sh{font-size:.76rem;font-weight:700;color:var(--blue)}
+.stage .ops{font-size:.68rem;color:var(--muted);margin-bottom:.25rem;line-height:1.25}
+.tasks{display:flex;flex-direction:column;gap:2px}
+.task{display:grid;grid-template-columns:28px 1fr 38px;gap:4px;align-items:center;font-size:.62rem;color:var(--muted)}
+.task .tb{height:7px;border-radius:4px;background:var(--blue-soft);overflow:hidden}
+.task .tb i{display:block;height:100%;background:var(--blue);border-radius:4px}
+.task.hot .tb i{background:var(--danger)} .task.hot{color:var(--danger);font-weight:700}
+.exch{flex:0 0 74px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;font-size:.64rem;color:var(--pink);font-weight:700;background:repeating-linear-gradient(135deg,var(--pink-soft) 0 6px,#fff 6px 12px);border-radius:10px;margin:0 4px;padding:.2rem}
+.exch b{font-size:.7rem}
+.exch.bc{color:var(--lime);background:repeating-linear-gradient(135deg,var(--lime-soft) 0 6px,#fff 6px 12px)}
+.tsum{font-size:.76rem;margin-top:.4rem}
+.score{width:100%;font-size:.78rem;border-collapse:collapse}
+.score th{border-bottom:2px solid var(--ink);padding:.2rem .3rem;text-align:left}
+.score td{border-bottom:1px dashed var(--rule);padding:.25rem .3rem;vertical-align:top;font-variant-numeric:tabular-nums}
+.sbar{height:9px;border-radius:5px;margin-top:3px}
+.headline{margin-top:.5rem;border-radius:12px;padding:.5rem .7rem;font-size:.84rem;background:linear-gradient(120deg,var(--spark-soft),var(--pink-soft))}
+.headline b.big{font-size:1.2rem;color:var(--pink)}
+.planbox{font-family:'Ubuntu Mono',monospace;font-size:.76rem;background:#FFFBF7;border:1px solid var(--rule);border-radius:8px;padding:.4rem .5rem;white-space:pre;overflow:auto;max-height:180px;margin-top:.4rem}
+.planbox .x{background:var(--pink-soft);color:var(--pink);font-weight:700}
+.planbox .g{background:var(--lime-soft);color:var(--lime);font-weight:700}
+
+.concl{padding:3rem 0 2rem;margin-top:2.5rem;background:linear-gradient(180deg,#FFF8F1,#FDEFF6)}
+.lessons{counter-reset:l;list-style:none;padding:0;margin:0}
+.lessons li{counter-increment:l;padding:.55rem 0 .55rem 2.6rem;position:relative;border-bottom:1px dashed var(--rule)}
+.lessons li::before{content:counter(l);position:absolute;left:0;top:.5rem;width:1.9rem;height:1.9rem;border-radius:50%;background:linear-gradient(135deg,var(--spark),var(--pink));color:#fff;font-weight:700;display:flex;align-items:center;justify-content:center;font-size:.85rem}
+.panel{background:#fff;border:1.5px solid var(--rule);border-radius:14px;padding:1rem 1.1rem}
+.panel-title{font-weight:700;margin-bottom:.5rem}
+.checklist{list-style:none;padding:0;margin:0}
+.checklist li{padding:.45rem 0 .45rem 2rem;position:relative;border-bottom:1px dashed var(--rule)}
+.checklist li::before{content:"";position:absolute;left:0;top:.55rem;width:20px;height:20px;border:2px solid var(--rule);border-radius:6px;background:#fff}
+.checklist li.got::before{border-color:var(--ok);background:var(--ok)}
+.checklist li.got::after{content:"✓";position:absolute;left:5px;top:.42rem;color:#fff;font-weight:700;font-size:.85rem}
+.checklist small{display:block;color:var(--muted)}
+.cta-big{display:block;text-align:center;border-radius:14px;padding:.9rem;background:linear-gradient(110deg,var(--spark),var(--pink),var(--violet));color:#fff;font-weight:700;text-decoration:none;font-size:1.05rem}
+.cta-big:hover{color:#fff;filter:brightness(1.05)}
+footer{padding:1.5rem 0 2.5rem;color:var(--muted);font-size:.88rem}
+#flight{position:fixed;inset:0;pointer-events:none;z-index:2000}
+.dot{position:absolute;left:0;top:0;width:10px;height:10px;margin:-5px 0 0 -5px;border-radius:50%}
+@media (max-width: 991.98px){ .sys{position:static;max-height:none} .three{grid-template-columns:1fr} .nw{grid-template-columns:1fr} }
+@media (prefers-reduced-motion: reduce){ html{scroll-behavior:auto} }
+</style>
+</head>
+<body>
+<div id="flight" aria-hidden="true"></div>
+<nav class="topnav sticky-top">
+  <div class="container-xxl d-flex flex-wrap justify-content-between align-items-center py-2 gap-2">
+    <a class="brand" href="#top">Spark, <span>three ways</span></a>
+    <div class="nav align-items-center">
+      <a class="nav-link" href="#ideas">Explained simply</a>
+      <a class="nav-link" href="#sim">Simulator</a>
+      <a class="nav-link" href="#conclusion">What the lab teaches</a>
+      <a class="nav-link cta" href="activity.html">Graded activity</a>
+    </div>
+  </div>
+</nav>
+
+<main id="top">
+<header class="hero">
+  <div class="container-xxl">
+    <h1>One question, three ways to ask Spark.</h1>
+    <p class="lead mt-3">Total bytes per host, written as Java MapReduce in lab 4.1, then as Spark RDDs, then as DataFrames. Along the way you will see that Spark does nothing until you ask for a result, find the shuffles in a plan, watch the optimiser rewrite your code, and fix a join that one busy host slows down.</p>
+    <div class="three">
+      <div class="api"><div class="lbl">Lab 4.1</div><b>Java MapReduce</b><div class="lines">about 90 lines, 3 files</div><div class="bar"><i style="width:100%;background:#FFB38F"></i></div><small>you write every step; nothing is optimised</small></div>
+      <div class="api"><div class="lbl">Step 2</div><b>Spark RDD</b><div class="lines">5 lines</div><div class="bar"><i style="width:9%;background:#7DD3FC"></i></div><small>shorter, but Spark runs your lambdas exactly as written</small></div>
+      <div class="api"><div class="lbl">Step 4</div><b>Spark DataFrame</b><div class="lines">2 lines</div><div class="bar"><i style="width:4%;background:#BEF264"></i></div><small>describes what you want, so the optimiser can rearrange it</small></div>
+    </div>
+  </div>
+</header>
+
+<section id="ideas" class="py-5">
+  <div class="container-xxl">
+    <h2 class="mb-1">Explained simply</h2>
+    <p class="muted mb-3">Nine ideas, each one used in a step.</p>
+    <div class="ideas">
+      <div class="idea" style="--c:var(--spark);--cs:var(--spark-soft)"><h3><span class="num">1</span>Spark in one sentence</h3>
+        <p>Spark splits data into <strong>partitions</strong> and runs the same work on each partition at the same time, keeping data in memory between steps where it can. That is why it is much faster than MapReduce, which writes to disk between every map and reduce.</p>
+        <p class="eg">Same map and reduce ideas as lab 4.1, much less code, much less disk.</p></div>
+      <div class="idea" style="--c:var(--cyan);--cs:var(--cyan-soft)"><h3><span class="num">2</span>RDD: the low-level API</h3>
+        <p>An RDD is a distributed list of items. You process it with your own Python functions: <code>map</code>, <code>filter</code>, <code>reduceByKey</code>. Spark cannot look inside those functions, so it runs them exactly as written, in the order written.</p>
+        <p class="eg">Powerful and flexible, but you are the optimiser.</p></div>
+      <div class="idea" style="--c:var(--violet);--cs:var(--violet-soft)"><h3><span class="num">3</span>DataFrame: the high-level API</h3>
+        <p>A DataFrame is a table with named columns. You say <em>what</em> you want (<code>groupBy("host").agg(sum("bytes"))</code>), and Spark's optimiser, <strong>Catalyst</strong>, decides <em>how</em>: which columns to read, where to filter, when to combine.</p>
+        <p class="eg">Shorter code and faster runs, for the same reason.</p></div>
+      <div class="idea" style="--c:var(--pink);--cs:var(--pink-soft)"><h3><span class="num">4</span>Lazy: nothing runs until you ask</h3>
+        <div class="vis chain"><span>read</span><b>›</b><span>filter</span><b>›</b><span>groupBy</span><b>›</b><span class="act">show()</span></div>
+        <p><strong>Transformations</strong> (map, filter, groupBy, join) only add to a plan and return instantly. <strong>Actions</strong> (count, show, collect, take, write) run the whole plan.</p>
+        <p class="eg">So timing a transformation measures nothing, and a mistake only shows up at the action.</p></div>
+      <div class="idea" style="--c:var(--blue);--cs:var(--blue-soft)"><h3><span class="num">5</span>Narrow and wide</h3>
+        <div class="vis nw"><div class="n1"><div class="t">Narrow: map, filter</div>each partition works alone<div class="pmini"><i></i><i></i><i></i></div></div><div class="w1"><div class="t">Wide: groupBy, join</div>data moves between partitions<div class="pmini w"><i></i><i></i><i></i></div></div></div>
+        <p class="eg">Every wide step is a <strong>shuffle</strong>, and every shuffle splits the job into another <strong>stage</strong>. Fewer shuffles, faster job.</p></div>
+      <div class="idea" style="--c:var(--amber);--cs:var(--amber-soft)"><h3><span class="num">6</span>reduceByKey vs groupByKey</h3>
+        <p><code>groupByKey</code> sends every single value across the network, then adds them. <code>reduceByKey</code> adds them up inside each partition first, then sends one number per key.</p>
+        <p class="eg">It is the combiner from lab 4.1, built in. Same answer, a tiny fraction of the shuffle.</p></div>
+      <div class="idea" style="--c:var(--lime);--cs:var(--lime-soft)"><h3><span class="num">7</span>Reading a plan</h3>
+        <p><code>explain()</code> prints how Spark will run a DataFrame query. Read the physical plan from the <strong>bottom up</strong>. Every <code>Exchange</code> line is a shuffle.</p>
+        <p class="eg">Count the Exchanges, and you know how many shuffles you are paying for.</p></div>
+      <div class="idea" style="--c:var(--danger);--cs:var(--danger-soft)"><h3><span class="num">8</span>Skewed joins, and two fixes</h3>
+        <p>A join sends all rows with the same key to the same task. If one host has 60% of the rows, one task does 60% of the work. <strong>Broadcast</strong>: copy the small table to every worker, so nothing moves. <strong>Salting</strong>: split the busy key into several sub-keys.</p>
+        <p class="eg">Broadcast when one side is small; salt when both sides are big.</p></div>
+      <div class="idea" style="--c:var(--cyan);--cs:var(--cyan-soft)"><h3><span class="num">9</span>Cache, coalesce, write</h3>
+        <p><code>cache()</code> keeps a result in memory for reuse, but only after an action fills it, and only worth it if you reuse it. <code>coalesce(n)</code> reduces the number of output files without a shuffle.</p>
+        <p class="eg">Measure before and after; never cache by habit.</p></div>
+    </div>
+    <h3 class="mt-4 mb-2">Words you will meet</h3>
+    <dl class="gloss">
+      <div style="--c:var(--spark)"><dt>Partition</dt><dd>One slice of the data. One task processes one partition.</dd></div>
+      <div style="--c:var(--pink)"><dt>Shuffle / Exchange</dt><dd>Moving rows between partitions so equal keys meet. The expensive part.</dd></div>
+      <div style="--c:var(--blue)"><dt>Stage</dt><dd>A group of tasks that run without a shuffle. A shuffle ends a stage.</dd></div>
+      <div style="--c:var(--violet)"><dt>Catalyst</dt><dd>Spark's query optimiser for DataFrames and SQL.</dd></div>
+      <div style="--c:var(--lime)"><dt>Broadcast join</dt><dd>Send the small table to every worker, so the big one never moves.</dd></div>
+      <div style="--c:var(--amber)"><dt>Spark UI</dt><dd>The web page on port 4040 showing jobs, stages, tasks and storage.</dd></div>
+    </dl>
+  </div>
+</section>
+
+<section id="sim" class="pt-2">
+  <div class="container-xxl">
+    <h2 class="mb-1">The simulator</h2>
+    <p class="muted mb-2">Press <strong>Run</strong> on each command in order. Under each one: a plain-language explanation, what changed, how long it takes on the VM, and a red note where the lab sheet needs a fix. The right side shows your variables (dashed means "planned, not run"), the plan lighting up when an action runs, the stages and tasks, and a scoreboard.</p>
+    <div class="rail" id="rail" role="tablist" aria-label="Lab steps"></div>
+    <div class="row g-3 mt-1">
+      <div class="col-lg-6">
+        <div id="stepPane"></div>
+        <div class="term-wrap mt-2"><div class="term-tabs"><i style="background:#FF5F57"></i><i style="background:#FEBC2E"></i><i style="background:#28C840"></i><span class="ms-2" id="termTitle">bash</span></div><pre class="term-body" id="termBody" aria-live="polite" tabindex="0"></pre></div>
+      </div>
+      <div class="col-lg-6">
+        <div class="sys" id="sys">
+          <div class="statusbar" id="statusbar"></div>
+          <div class="zone" id="zMachine"><div class="zone-h"><b>The machine</b><span>processes and HDFS paths</span></div><div id="machine"></div></div>
+          <div class="zone" id="zLazy"><div class="zone-h"><b>Your plan: planned or run?</b><span id="lazyState"></span></div><div id="lazy"></div></div>
+          <div class="zone" id="zStages"><div class="zone-h"><b>Stages, shuffles and tasks</b><span>from the Spark UI</span></div><div id="stages"></div></div>
+          <div class="zone" id="zScore"><div class="zone-h"><b>Scoreboard</b><span>the numbers for your report</span></div><div id="score"></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="concl" id="conclusion">
+  <div class="container-xxl">
+    <h2 class="mb-3">What this lab teaches</h2>
+    <div class="row g-4">
+      <div class="col-lg-7">
+        <ol class="lessons">
+          <li><strong>Same model, less code.</strong> The RDD version has the same map and reduce shape as the Java, in 5 lines instead of about 90; the DataFrame version needs 2.</li>
+          <li><strong>Nothing runs until an action.</strong> The transformation lines returned instantly; only takeOrdered, show, take, count and write did work. (Reading JSON without a schema is the exception: it scans the file to guess the schema.)</li>
+          <li><strong>reduceByKey beats groupByKey.</strong> The same totals, with about 10 KB shuffled instead of about 15 MB: the combiner idea again.</li>
+          <li><strong>Exchanges are shuffles.</strong> The DataFrame aggregation has one Exchange, with a partial_sum below it: Spark added the combiner by itself.</li>
+          <li><strong>Catalyst rewrites DataFrame code, not RDD code.</strong> The badly ordered DataFrame query still read only two columns and pushed the filter into the scan; the RDD ran every lambda on every record.</li>
+          <li><strong>Skew makes one task slow.</strong> In the sort-merge join, the task holding host007 took many times the median. Broadcasting removed the shuffle; salting spread host007 over 8 sub-keys. The totals never changed.</li>
+          <li><strong>Cache only what you reuse, and measure it.</strong> The cached count was much faster, but only after an action filled the cache.</li>
+          <li><strong>DataFrames are shorter and faster because they describe intent rather than procedure.</strong> That is the sentence to defend.</li>
+        </ol>
+      </div>
+      <div class="col-lg-5">
+        <div class="panel mb-3">
+          <div class="panel-title">Your deliverable, collected as you run the simulator</div>
+          <ul class="checklist" id="checklist">
+            <li data-k="impl">Three implementations with line counts<small>lab 4.1, steps 2 and 4</small></li>
+            <li data-k="explain">explain() with the shuffle boundary marked<small>step 5</small></li>
+            <li data-k="gbk">groupByKey vs reduceByKey timings and shuffle sizes<small>steps 2 and 3</small></li>
+            <li data-k="skew">Before and after evidence for the skewed join<small>steps 7, 8 and 9</small></li>
+          </ul>
+        </div>
+        <a class="cta-big" href="activity.html">Take the graded activity →</a>
+      </div>
+    </div>
+  </div>
+</section>
+</main>
+<footer><div class="container-xxl">Big Data Analytics, Lab 4.2: Processing Data with Spark RDDs and DataFrames. Totals, top hosts, row counts and the skewed-join department sums come from running the real data; timings, shuffle sizes and IDs are representative of a single-VM run.</div></footer>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+(function(){
+"use strict";
+const $=(s,r=document)=>r.querySelector(s);
+const reduceMotion=window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const hasGsap=typeof window.gsap!=='undefined';
+const esc=s=>String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+const rnd=(a,b)=>a+Math.floor(Math.random()*(b-a+1));
+const n=x=>Number(x).toLocaleString('en-US');
+let fastMode=false;
+const sleep=ms=>new Promise(r=>setTimeout(r,ms)); const wait=ms=>fastMode?Promise.resolve():sleep(ms);
+const HOME='/home/hadoop';
+const TOP5=[['host042',2598383648],['host035',2578561735],['host091',2576632177],['host027',2564864248],['host123',2561489344]];
+const DEPT=[['dept0',20055283852],['dept1',20081839702],['dept2',170080710984],['dept3',20015025636],['dept4',20013525062]];
+const D5TOP=[['host046',141524198,561],['host172',140565081,535],['host061',138685482,535],['host053',138292128,549],['host023',137170604,523]];
+
+/* ================= state ================= */
+const S={busy:false,mode:'shell',cwd:HOME,lines:[],procs:[],hdfs:false,spark:false,
+  vars:[],plan:null,stages:null,score:{rows:[],shuffle:{},joins:{},cache:null},planText:null,files:[],fresh:new Set(),conf:{bcast:'10MB'},evidence:{}};
+const V=(name,kind,state='lazy')=>{ const v=S.vars.find(x=>x.name===name); if(v){ v.kind=kind; v.state=state; } else S.vars.push({name,kind,state}); };
+const setVar=(name,state)=>{ const v=S.vars.find(x=>x.name===name); if(v) v.state=state; };
+function addProc(k,name,cls){ S.procs=S.procs.filter(p=>p.k!==k); S.procs.push({k,name,cls}); }
+function rmProc(k){ S.procs=S.procs.filter(p=>p.k!==k); }
+function addFile(p){ if(!S.files.includes(p)){ S.files.push(p); S.fresh.add(p); setTimeout(()=>S.fresh.delete(p),4000); } }
+
+/* ================= terminal ================= */
+let termDirty=true, jump=false;
+function tpush(h){ S.lines.push(h); if(S.lines.length>700) S.lines.splice(0,S.lines.length-700); termDirty=true; }
+function out(t,cls){ String(t).split('\n').forEach(l=>tpush(cls?`<span class="${cls}">${esc(l)}</span>`:esc(l))); }
+function prompt(){ if(S.mode==='py') return '<span class="py">&gt;&gt;&gt; </span>'; const c=S.cwd===HOME?'~':S.cwd; return `<span class="pr">hadoop@ubuntuOS</span>:<span class="pa">${c}</span>$ `; }
+function echo(code){ const L=code.split('\n'); L.forEach((l,i)=>{ let pre; if(i===0) pre=prompt(); else if(S.mode==='py') pre=(/^[\s.)\]]/.test(l)||l==='')?'<span class="py">... </span>':'<span class="py">&gt;&gt;&gt; </span>'; else pre='<span class="dim">&gt; </span>'; tpush(pre+esc(l)); }); }
+function renderTerm(){ $('#termTitle').textContent=S.mode==='py'?'pyspark (Python shell with a SparkSession)':'bash'; const b=$('#termBody'), atB=b.scrollHeight-b.scrollTop-b.clientHeight<40; b.innerHTML=S.lines.join('\n')+(S.mode==='busy'?'':'\n'+prompt()); if(atB||jump){ b.scrollTop=b.scrollHeight; jump=false; } termDirty=false; }
+function fly(a,b,color,k=4){ if(fastMode||!a||!b||reduceMotion||!hasGsap) return; for(let i=0;i<k;i++) setTimeout(()=>{ const A=a.getBoundingClientRect(), B=b.getBoundingClientRect(); if(A.bottom<0||A.top>innerHeight) return; const d=document.createElement('div'); d.className='dot'; d.style.background=color; $('#flight').appendChild(d); gsap.fromTo(d,{x:A.left+A.width/2+rnd(-20,20),y:A.top+A.height/2},{x:B.left+B.width/2+rnd(-20,20),y:B.top+B.height/2,duration:.6,ease:'power2.inOut',onComplete:()=>d.remove()}); },i*80); }
+
+/* plan chain helper: nodes = [{t,sub,wide,action}] */
+function plan(name,nodes,note){ S.plan={name,nodes:nodes.map(x=>({...x,on:false})),note,ran:false}; }
+async function runPlan(){ if(!S.plan) return; for(const nd of S.plan.nodes){ nd.on=true; renderAll(); await wait(220); } S.plan.ran=true; }
+/* stage view: stages=[{name,ops,tasks:[secs], hot}] , exch=[{label,bytes,kind}] between stages */
+function stages(title,list,exch,summary){ S.stages={title,list,exch,summary}; S.planText=null; }
+function taskSet(nTasks,base,hotIdx,hotSecs,jit=.25){ return [...Array(nTasks)].map((_,i)=>i===hotIdx?hotSecs:+(base*(1+(Math.random()-.5)*jit)).toFixed(2)); }
+function scoreRow(key,row){ const i=S.score.rows.findIndex(r=>r.key===key); if(i>=0) S.score.rows[i]={key,...row}; else S.score.rows.push({key,...row}); }
+
+/* ================= rendering ================= */
+function renderAll(){
+  const sv=(on,l)=>`<span class="svc ${on?'on':''}">${l}</span>`;
+  $('#statusbar').innerHTML='Running: '+sv(S.hdfs,'HDFS')+sv(S.spark,'Spark driver + executor (local[*])')+`<span class="svc ${S.conf.bcast==='-1'?'on':''}">auto-broadcast ${S.conf.bcast==='-1'?'OFF':'on (10 MB)'}</span>`;
+  $('#machine').innerHTML=`<div class="procs">${S.procs.length?S.procs.map(p=>`<span class="proc ${p.cls||''}">${esc(p.name)}</span>`).join(''):'<span class="none">Nothing running yet.</span>'}</div>${S.files.length?`<div class="files">${S.files.map(f=>`<div class="${S.fresh.has(f)?'new':''}">${esc(f)}</div>`).join('')}</div>`:''}`;
+  // lazy
+  let L='';
+  if(S.vars.length) L+=`<div class="mini-h">Variables in your Python session</div><div class="vars">${S.vars.map(v=>`<span class="var ${v.kind} ${v.state}" title="${v.state}">${v.name}<small> ${v.kind.toUpperCase()}${v.state==='cached'?', cached':v.state==='ran'?', computed':', planned'}</small></span>`).join('')}</div>`;
+  if(S.plan){ L+=`<div class="plan">${S.plan.nodes.map((x,i)=>`${i?'<span class="ar">›</span>':''}<span class="node ${x.on?'on':''} ${x.action?'action':''} ${x.wide?'wide':''}">${esc(x.t)}${x.sub?`<small>${esc(x.sub)}</small>`:''}</span>`).join('')}</div><div class="lazy-note ${S.plan.ran?'ran':''}">${S.plan.ran?'An action ran the whole plan.':S.plan.note||'Only a plan so far: these lines returned instantly and read no data.'}</div>`; }
+  if(!L) L='<div class="none">Variables appear once PySpark starts in step 1. Dashed means planned only; solid green means computed by an action.</div>';
+  $('#lazy').innerHTML=L; $('#lazyState').textContent=S.vars.length?`${S.vars.filter(v=>v.state!=='lazy').length} of ${S.vars.length} computed`:'';
+  // stages
+  let G='';
+  if(S.stages){ const st=S.stages, mx=Math.max(...st.list.flatMap(s=>s.tasks));
+    G+=`<div class="mini-h">${esc(st.title)}</div><div class="stages">`;
+    st.list.forEach((s,i)=>{ if(i&&st.exch[i-1]){ const e=st.exch[i-1]; G+=`<div class="exch ${e.kind==='bc'?'bc':''}"><b>${e.kind==='bc'?'Broadcast':'Exchange'}</b>${esc(e.label)}<br>${esc(e.bytes||'')}</div>`; }
+      const med=[...s.tasks].sort((a,b)=>a-b)[Math.floor(s.tasks.length/2)];
+      G+=`<div class="stage"><div class="sh">Stage ${s.id}: ${s.tasks.length} task${s.tasks.length>1?'s':''}</div><div class="ops">${esc(s.ops)}</div><div class="tasks">${s.tasks.slice(0,10).map((t,j)=>`<div class="task ${s.hot&&t===Math.max(...s.tasks)&&t>med*3?'hot':''}"><span>t${j}</span><div class="tb"><i style="width:${Math.max(3,t/mx*100)}%"></i></div><span>${t<10?t.toFixed(1):Math.round(t)} s</span></div>`).join('')}</div></div>`; });
+    G+='</div>'; if(st.summary) G+=`<div class="tsum">${st.summary}</div>`; }
+  if(S.planText) G+=`<div class="mini-h mt-2">${S.planText.title}</div><div class="planbox">${S.planText.html}</div>`;
+  if(!G) G='<div class="none">Stages appear when the first action runs.</div>';
+  $('#stages').innerHTML=G;
+  // score
+  let K='';
+  const rows=S.score.rows;
+  if(rows.length){ const mt=Math.max(...rows.filter(r=>r.time).map(r=>r.time),1);
+    K+=`<table class="score"><tr><th>Implementation</th><th>Lines</th><th>Time</th><th>Shuffle write</th></tr>${rows.map(r=>`<tr><td><b>${r.name}</b></td><td>${r.lines}</td><td>${r.time?r.time.toFixed(1)+' s':'n/a'}${r.time?`<div class="sbar" style="width:${Math.max(4,r.time/mt*100)}%;background:${r.color}"></div>`:''}</td><td>${r.shuffle||''}</td></tr>`).join('')}</table>`; }
+  if(S.score.shuffle.gbk&&S.score.shuffle.rbk){ K+=`<div class="headline">groupByKey shuffled <b>${S.score.shuffle.gbk}</b>; reduceByKey shuffled <b>${S.score.shuffle.rbk}</b>: about <b class="big">1,600×</b> less, for the same answer.</div>`; S.evidence.gbk=true; }
+  const J=S.score.joins;
+  if(Object.keys(J).length){ const mj=Math.max(...Object.values(J).map(j=>j.time)); K+=`<div class="mini-h mt-2">The join on skewed data</div><table class="score"><tr><th>Strategy</th><th>Time</th><th>Slowest task vs median</th></tr>${[['smj','Sort-merge (skewed)','var(--danger)'],['bc','Broadcast','var(--lime)'],['salt','Salted (8)','var(--cyan)']].filter(x=>J[x[0]]).map(x=>`<tr><td><b>${x[1]}</b></td><td>${J[x[0]].time.toFixed(1)} s<div class="sbar" style="width:${J[x[0]].time/mj*100}%;background:${x[2]}"></div></td><td>${J[x[0]].ratio}</td></tr>`).join('')}</table>`; if(J.smj&&(J.bc||J.salt)) S.evidence.skew=true; }
+  if(S.score.cache) K+=`<div class="mini-h mt-2">Caching agg2</div><table class="score"><tr><td>uncached, first</td><td>${S.score.cache[0]} s</td></tr><tr><td>uncached, second</td><td>${S.score.cache[1]} s</td></tr><tr><td>cached</td><td><b>${S.score.cache[2]} s</b></td></tr></table>`;
+  if(!K) K='<div class="none">Timings and shuffle sizes collect here.</div>';
+  $('#score').innerHTML=K;
+  document.querySelectorAll('#checklist li').forEach(li=>li.classList.toggle('got',!!S.evidence[li.dataset.k]));
+  if(termDirty) renderTerm();
+}
+setInterval(()=>{ if(!fastMode) renderAll(); },400);
+
+/* ================= commands ================= */
+const C=o=>o;
+const PY=(label,code,run,more)=>Object.assign({label,code,run,py:true},more);
+const STEPS=[
+ {title:'Start Spark and load the data',short:'load',intro:'Start HDFS and PySpark with 8 shuffle partitions, then read events.json as a DataFrame.',cmds:[
+  C({label:'Start HDFS',code:'start-dfs.sh',run:async()=>{ out('Starting namenodes on [localhost]\nStarting datanodes\nStarting secondary namenodes [ubuntuOS]'); ['NameNode','DataNode','SecondaryNameNode'].forEach(x=>addProc(x,x)); S.hdfs=true; addFile('hdfs:/user/hadoop/lab3/events.json   (325 MB, 3 blocks)'); addFile('hdfs:/user/hadoop/lab4/skewed.json   (35 MB, from lab 4.1)'); },simple:'Turns on HDFS, where events.json lives.',what:'Spark here runs in local mode inside one Java process, so YARN is not needed; only HDFS is.',see:'Three HDFS processes, and the two input files.',vm:'about 15 seconds',focus:'zMachine'}),
+  C({label:'Start PySpark with 8 shuffle partitions',code:'pyspark --conf spark.sql.shuffle.partitions=8',run:async()=>{ S.mode='busy'; await wait(900); out("Setting default log level to \"WARN\".\nWelcome to\n      ____              __\n     / __/__  ___ _____/ /__\n    _\\ \\/ _ \\/ _ `/ __/  '_/\n   /__ / .__/\\_,_/_/ /_/\\_\\   version 3.5.1\n      /_/\n\nUsing Python version 3.12.3 (main, Apr 10 2024 05:33:47)\nSpark context Web UI available at http://ubuntuOS:4040\nSpark context available as 'sc' (master = local[*], app id = local-1791902210551).\nSparkSession available as 'spark'.",'dim'); S.mode='py'; S.spark=true; addProc('ss','SparkSubmit: driver + executor','sp'); },
+   simple:'Opens a Python shell connected to Spark, and tells Spark to use 8 pieces instead of 200 whenever it shuffles.',what:'<code>spark.sql.shuffle.partitions</code> is how many partitions a DataFrame shuffle produces. The default, 200, suits a cluster with hundreds of cores; on one VM, 200 tiny tasks spend more time being scheduled than working, and distort every timing.',see:'A Spark process; the prompt becomes &gt;&gt;&gt;. The Spark UI is on port 4040.',vm:'10 to 20 seconds',focus:'zMachine'}),
+  PY('Read the JSON and look at it','PATH_IN = f"hdfs://localhost:9000/user/{spark.sparkContext.sparkUser()}/lab3/events.json"\ndf = spark.read.json(PATH_IN)\ndf.printSchema()\ndf.count()',async()=>{ plan('df',[{t:'read.json',sub:'events.json'},{t:'count()',action:true}],'read.json already ran one job: it scanned the file to guess the schema.'); V('df','df','ran'); S.mode='busy'; await wait(900); out('root\n |-- action: string (nullable = true)\n |-- bytes: long (nullable = true)\n |-- event_date: string (nullable = true)\n |-- event_id: long (nullable = true)\n |-- event_time: string (nullable = true)\n |-- host: string (nullable = true)\n |-- src_ip: string (nullable = true)\n'); await runPlan(); out('2000000'); S.mode='py';
+     stages('Two jobs: schema inference, then count',[{id:0,ops:'scan all JSON to infer schema',tasks:taskSet(3,9.4,-1,0)},{id:1,ops:'scan + partial count',tasks:taskSet(3,7.2,-1,0)},{id:2,ops:'final count',tasks:[0.1]}],[null,{label:'count per partition',bytes:'177 B'}],'The file was read <b>twice</b>: once to guess the schema, once to count.'); },
+   {simple:'Builds the HDFS path with your username, reads the file as a table, prints its columns, and counts the rows.',what:'<code>sparkUser()</code> returns "hadoop", so the f-string makes the right path (unlike the <code>$USER</code> bug in lab 3.1). <code>read.json</code> with no schema must scan the whole file to guess the columns, which is why it is slow and why production code passes a schema. Columns come out in alphabetical order.',see:'Seven columns and 2,000,000. The stage view shows two separate scans of the file.',vm:'about 30 to 40 seconds',focus:'zStages'})]
+  ,take:['Set shuffle partitions to suit your machine; the default of 200 is for clusters.','Most things in Spark are lazy, but reading JSON without a schema is not: it scans the file immediately.']},
+ {title:'The RDD version',short:'RDD',intro:'Write the MapReduce job with RDDs: same shape as the Java, five lines.',cmds:[
+  PY('Read lines and build the computation, then run it','import json, time\n\nrdd = spark.sparkContext.textFile(PATH_IN)\n\nt = time.time()\nresult_rdd = (rdd\n    .map(json.loads)\n    .map(lambda e: (e["host"], e["bytes"]))\n    .reduceByKey(lambda a, b: a + b))\ntop = result_rdd.takeOrdered(5, key=lambda kv: -kv[1])\nprint(f"rdd reduceByKey: {time.time()-t:.1f}s")\nfor k, v in top: print(k, v)',async()=>{
+     V('rdd','rdd'); V('result_rdd','rdd'); plan('result_rdd',[{t:'textFile',sub:'3 partitions'},{t:'map(json.loads)'},{t:'map → (host, bytes)'},{t:'reduceByKey',sub:'combine, then shuffle',wide:true},{t:'takeOrdered(5)',action:true}]);
+     renderAll(); await wait(700); S.mode='busy'; await runPlan(); setVar('rdd','ran'); setVar('result_rdd','ran');
+     stages('reduceByKey: one shuffle, two stages',[{id:2,ops:'textFile → json.loads → map → combine per partition',tasks:taskSet(3,10.8,-1,0)},{id:3,ops:'merge sums → takeOrdered',tasks:taskSet(3,0.2,-1,0)}],[{label:'reduceByKey',bytes:'9.6 KiB'}],'Shuffle write: <b>9.6 KiB</b>. Each partition sent at most one (host, sum) per host.');
+     fly($('#zLazy'),$('#zStages'),'var(--cyan)');
+     out('rdd reduceByKey: 12.4s'); TOP5.forEach(([h,v])=>out(`${h} ${v}`)); S.mode='py';
+     S.score.shuffle.rbk='9.6 KiB'; scoreRow('rbk',{name:'RDD reduceByKey',lines:5,time:12.4,shuffle:'9.6 KiB',color:'var(--cyan)'}); },
+   {simple:'Reads the file as plain lines, turns each line into a (host, bytes) pair, adds them up per host, and prints the top five.',what:'<code>textFile</code>, both <code>map</code>s and <code>reduceByKey</code> are transformations: they returned instantly. Only <code>takeOrdered</code> is an action, so the timer measures the whole job. <code>reduceByKey</code> adds within each partition before shuffling: the lab 4.1 combiner, built in.',see:'The plan lights up only when takeOrdered runs. host042 is the top host with 2,598,383,648 bytes. The shuffle carried only 9.6 KiB.',vm:'about 10 to 15 seconds',focus:'zLazy'})]
+  ,take:['RDD code has the same map → shuffle → reduce shape as MapReduce, in a handful of lines.','Transformations are instant; the action runs everything.']},
+ {title:'Compare groupByKey with reduceByKey',short:'groupByKey',intro:'The same result, computed the wasteful way.',cmds:[
+  PY('Run the groupByKey version','t = time.time()\nresult_group = (rdd\n    .map(json.loads)\n    .map(lambda e: (e["host"], e["bytes"]))\n    .groupByKey()\n    .mapValues(sum))\nprint(result_group.take(3))\nprint(f"rdd groupByKey: {time.time()-t:.1f}s")',async()=>{
+     V('result_group','rdd'); plan('result_group',[{t:'textFile'},{t:'map(json.loads)'},{t:'map → (host, bytes)'},{t:'groupByKey',sub:'ships every value',wide:true},{t:'mapValues(sum)'},{t:'take(3)',action:true}]);
+     renderAll(); await wait(500); S.mode='busy'; await runPlan(); setVar('result_group','ran');
+     stages('groupByKey: every value crosses the shuffle',[{id:4,ops:'textFile → json.loads → map → write ALL pairs',tasks:taskSet(3,13.9,-1,0)},{id:5,ops:'group 2M values → sum',tasks:taskSet(3,2.6,-1,0)}],[{label:'groupByKey',bytes:'15.4 MiB'}],'Shuffle write: <b>15.4 MiB</b>, all 2,000,000 (host, bytes) pairs.');
+     out("[('host000', 2489180004), ('host004', 2509272999), ('host008', 2517511900)]\nrdd groupByKey: 17.9s"); S.mode='py';
+     S.score.shuffle.gbk='15.4 MiB'; scoreRow('gbk',{name:'RDD groupByKey',lines:5,time:17.9,shuffle:'15.4 MiB',color:'var(--amber)'}); },
+   {simple:'Groups all the byte values of each host into one big list, sends those lists across, then sums each list.',what:'Same answer, different route: nothing is added up before the shuffle. Compare "Shuffle Write" for the two jobs in the Spark UI (Stages tab): that number, not the clock, is the evidence. On a skewed key, groupByKey can also run one executor out of memory, because one host\'s whole list must fit on one machine.',see:'Same totals (host000 = 2,489,180,004, as in lab 4.1), slower, and about 1,600 times more shuffle data.',vm:'15 to 20 seconds',focus:'zScore'}),
+  C({label:'Check Shuffle Write in the Spark UI',code:'# http://localhost:4040 > Stages > compare Shuffle Write for the two jobs',run:()=>{},simple:'Opens the Spark UI to read the shuffle sizes.',what:'Each stage row has a Shuffle Write column.',see:'9.6 KiB against 15.4 MiB, as in the scoreboard.',vm:'n/a',focus:'zScore',py:true})]
+  ,take:['groupByKey ships every value; reduceByKey ships one partial sum per key per partition.','Always prefer reduceByKey (or aggregateByKey) when the operation can be combined.']},
+ {title:'The DataFrame version',short:'DataFrame',intro:'Two lines, same answer, and Catalyst does the optimising.',cmds:[
+  PY('Aggregate, show, then time a second run','from pyspark.sql.functions import sum as _sum, count as _count\n\nagg = df.groupBy("host").agg(_sum("bytes").alias("total_bytes"))\nagg.orderBy("total_bytes", ascending=False).show(5)\n\nt = time.time()\nagg.orderBy("total_bytes", ascending=False).take(5)\nprint(f"dataframe: {time.time()-t:.1f}s")',async()=>{
+     V('agg','df'); plan('agg',[{t:'df (scan json)',sub:'reads only host, bytes'},{t:'partial_sum',sub:'map-side combine'},{t:'Exchange',sub:'hashpartitioning(host, 8)',wide:true},{t:'sum'},{t:'TakeOrdered(5)',action:true}]);
+     renderAll(); await wait(500); S.mode='busy'; await runPlan(); setVar('agg','ran');
+     stages('DataFrame: scan + partial sum, one Exchange, final sum',[{id:7,ops:'FileScan json [bytes, host] → HashAggregate partial_sum',tasks:taskSet(3,4.4,-1,0)},{id:8,ops:'HashAggregate sum → TakeOrderedAndProject',tasks:taskSet(1,0.3,-1,0)}],[{label:'hashpartitioning(host, 8)',bytes:'12.1 KiB'}],'AQE merged the 8 shuffle partitions into 1 because they were tiny. The scan read only two of seven columns.');
+     out('+-------+-----------+\n|   host|total_bytes|\n+-------+-----------+\n'+TOP5.map(([h,v])=>`|${h}| ${v}|`).join('\n')+'\n+-------+-----------+\nonly showing top 5 rows\n\ndataframe: 5.3s'); S.mode='py';
+     scoreRow('df',{name:'DataFrame',lines:2,time:5.3,shuffle:'12.1 KiB',color:'var(--violet)'}); scoreRow('mr',{name:'Java MapReduce (lab 4.1)',lines:'about 90',time:31,shuffle:'10.6 KiB (combiner)',color:'#FFB38F'}); S.evidence.impl=true; },
+   {simple:'Groups by host and sums bytes in one line, prints the top five, then runs it again and times the second run.',what:'The second run is timed so that first-time costs (like the OS caching the file) do not distort the comparison. The DataFrame still reads the JSON on every action, because nothing is cached, but the JSON parsing runs in the JVM, it reads only the needed columns, and Spark adds the combine step by itself.',see:'The same top five, in about 5 seconds against 12 for the RDD.',vm:'about 10 seconds for both runs',focus:'zScore'})]
+  ,take:['Two lines of DataFrame code replace five of RDD and about 90 of Java.','It is faster because Spark knows what you are asking for.']},
+ {title:'Read the physical plan',short:'explain',intro:'Print all four plans and find the shuffle.',cmds:[
+  PY('Explain the aggregation','agg.explain(True)',async()=>{
+     const phys='== Physical Plan ==\nAdaptiveSparkPlan isFinalPlan=false\n+- HashAggregate(keys=[host#5], functions=[sum(bytes#1L)], output=[host#5, total_bytes#40L])\n   +- Exchange hashpartitioning(host#5, 8), ENSURE_REQUIREMENTS, [plan_id=112]\n      +- HashAggregate(keys=[host#5], functions=[partial_sum(bytes#1L)], output=[host#5, sum#44L])\n         +- FileScan json [bytes#1L,host#5] Batched: false, DataFilters: [], Format: JSON, Location: InMemoryFileIndex(1 paths)[hdfs://localhost:9000/user/hadoop/lab3/events.json], PartitionFilters: [], PushedFilters: [], ReadSchema: struct<bytes:bigint,host:string>';
+     out("== Parsed Logical Plan ==\n'Aggregate ['host], ['host, sum('bytes) AS total_bytes#40]\n+- Relation [action#0,bytes#1L,event_date#2,event_id#3L,event_time#4,host#5,src_ip#6] json\n\n== Analyzed Logical Plan ==\nhost: string, total_bytes: bigint\nAggregate [host#5], [host#5, sum(bytes#1L) AS total_bytes#40L]\n+- Relation [action#0,bytes#1L,event_date#2,event_id#3L,event_time#4,host#5,src_ip#6] json\n\n== Optimized Logical Plan ==\nAggregate [host#5], [host#5, sum(bytes#1L) AS total_bytes#40L]\n+- Project [bytes#1L, host#5]\n   +- Relation [action#0,bytes#1L,event_date#2,event_id#3L,event_time#4,host#5,src_ip#6] json\n\n"+phys);
+     S.planText={title:'Physical plan, read from the bottom up',html:esc(phys).replace(/(Exchange hashpartitioning\(host#5, 8\))/,'<span class="x">$1</span>').replace(/(partial_sum\(bytes#1L\))/,'<span class="g">$1</span>').replace(/(ReadSchema: struct&lt;bytes:bigint,host:string&gt;)/,'<span class="g">$1</span>')}; S.evidence.explain=true; },
+   {simple:'Prints how Spark will run the aggregation: the plan as written, checked, optimised, and finally the physical steps.',what:'Read the physical plan bottom up: FileScan reads only <code>bytes</code> and <code>host</code>; a <strong>partial_sum</strong> adds within each partition (the combiner); <strong>Exchange hashpartitioning(host, 8)</strong> is the shuffle into 8 partitions; the top HashAggregate finishes the sum. The optimised logical plan added a <code>Project [bytes, host]</code> you never wrote. <code>AdaptiveSparkPlan</code> means AQE may still adjust the plan at run time.',see:'Exactly one Exchange (pink) with a partial_sum (green) below it: one shuffle, two stages.',vm:'instant',focus:'zStages'})]
+  ,take:['Every Exchange is a shuffle and a stage boundary; count them.','partial_sum below the Exchange is the combiner Spark inserted for you.']},
+ {title:'Watch Catalyst optimise, and watch it fail to',short:'Catalyst',intro:'A badly ordered DataFrame query, and the same thing with RDDs.',cmds:[
+  PY('A deliberately bad DataFrame query','bad = (df.select("*")\n         .withColumn("kb", df.bytes / 1024)\n         .filter("host = \'host042\'")\n         .select("host", "kb"))\nbad.explain()',async()=>{
+     V('bad','df'); plan('bad',[{t:'select(*)',sub:'all 7 columns'},{t:'withColumn kb'},{t:'filter host042',sub:'written last'},{t:'select host, kb'}],'Only a plan. explain() shows what Catalyst made of it, without running anything.');
+     const phys="== Physical Plan ==\n*(1) Project [host#5, (cast(bytes#1L as double) / 1024.0) AS kb#60]\n+- *(1) Filter (isnotnull(host#5) AND (host#5 = host042))\n   +- FileScan json [bytes#1L,host#5] Batched: false, DataFilters: [isnotnull(host#5), (host#5 = host042)], Format: JSON, Location: InMemoryFileIndex(1 paths)[hdfs://localhost:9000/user/hadoop/lab3/events.json], PartitionFilters: [], PushedFilters: [IsNotNull(host), EqualTo(host,host042)], ReadSchema: struct<bytes:bigint,host:string>";
+     out(phys); S.planText={title:'Catalyst rewrote the bad query',html:esc(phys).replace(/(PushedFilters: \[IsNotNull\(host\), EqualTo\(host,host042\)\])/,'<span class="g">$1</span>').replace(/(ReadSchema: struct&lt;bytes:bigint,host:string&gt;)/,'<span class="g">$1</span>')}; },
+   {simple:'Writes the query in the worst order (all columns, compute, then filter) and asks Spark how it would run it.',what:'Catalyst rewrote it: the filter moved down into the scan (<strong>PushedFilters</strong>), and only the two needed columns are read (<strong>ReadSchema</strong>). The kb calculation now runs only on host042\'s rows. You wrote it badly; Spark runs it well.',see:'PushedFilters with the host condition and a two-column ReadSchema, highlighted.',vm:'instant',focus:'zStages'}),
+  PY('The RDD equivalent','bad_rdd = (rdd.map(json.loads)\n              .map(lambda e: (e["host"], e["bytes"] / 1024))\n              .filter(lambda kv: kv[0] == "host042"))\nprint(bad_rdd.toDebugString().decode())',async()=>{
+     V('bad_rdd','rdd'); plan('bad_rdd',[{t:'textFile',sub:'every line'},{t:'json.loads',sub:'all 2M lines'},{t:'map → kb',sub:'all 2M lines'},{t:'filter host042',sub:'finally'}],'Spark cannot see inside lambdas, so it will run them exactly in this order, on every record.');
+     const dbg='(3) PythonRDD[21] at RDD at PythonRDD.scala:53 []\n |  hdfs://localhost:9000/user/hadoop/lab3/events.json MapPartitionsRDD[1] at textFile at NativeMethodAccessorImpl.java:0 []\n |  hdfs://localhost:9000/user/hadoop/lab3/events.json HadoopRDD[0] at textFile at NativeMethodAccessorImpl.java:0 []';
+     out(dbg); S.planText={title:'RDD lineage: no optimisation, and the lambdas are hidden in one PythonRDD',html:esc(dbg).replace(/(PythonRDD\[21\])/,'<span class="x">$1</span>')}; },
+   {simple:'The same steps as an RDD, then prints its lineage, the RDD\'s own "plan".',what:'Nothing is rewritten: every line is parsed and converted to kb, and only then filtered. Spark cannot move the filter earlier because it cannot read your lambdas.',see:'A three-line lineage: the file, and one PythonRDD.',vm:'instant',focus:'zStages',fix:'The sheet says the lineage "shows the map running over every record before the filter". In PySpark it does not show that: consecutive Python map and filter calls are pipelined into a single <code>PythonRDD</code>, so the lineage is just the file plus one PythonRDD. The point still holds, and the collapsed line is itself the evidence: Spark sees one opaque Python function it cannot reorder.'})]
+  ,take:['Catalyst pushed the filter into the scan and pruned columns, even though the code was written badly.','RDD code runs as written, because Python functions are opaque to Spark.']},
+ {title:'Build a skewed join',short:'skewed join',intro:'Join the skewed data from lab 4.1 with a 200-row host table and look at the task times.',cmds:[
+  PY('Turn off automatic broadcast joins',`spark.conf.set("spark.sql.autoBroadcastJoinThreshold", -1)`,()=>{ S.conf.bcast='-1'; },
+   {extra:true,simple:'Stops Spark from quietly choosing a broadcast join for small tables.',what:'Any table smaller than 10 MB is broadcast automatically. The 200-row host table is tiny, so without this line Spark would broadcast it in step 7 too, there would be no shuffle, and no skew to see.',see:'The status bar shows auto-broadcast OFF.',vm:'instant',focus:'zMachine',fix:'The sheet expects a slow, skewed join in step 7, but Spark 3.5 broadcasts the 200-row table automatically, so step 7 already looks like step 8. Turning the threshold off first makes the skew appear. The explicit <code>broadcast()</code> hint in step 8 still works with the threshold off.'}),
+  PY('Read the skewed data and build the host table','skewed = spark.read.json(f"hdfs://localhost:9000/user/{spark.sparkContext.sparkUser()}/lab4/skewed.json")\n\nhosts = spark.createDataFrame(\n    [(f"host{i:03d}", "server" if i % 3 == 0 else "laptop", f"dept{i % 5}") for i in range(200)],\n    ["host", "kind", "dept"])',async()=>{ V('skewed','df','ran'); V('hosts','df'); S.mode='busy'; await wait(700); S.mode='py'; },
+   {simple:'Loads the million skewed events (60% from host007) and makes a small table: each host\'s kind and department.',what:'host i belongs to <code>dept{i % 5}</code>, so host007 is in dept2. The read scans skewed.json once for its schema.',see:'Two new DataFrames.',vm:'about 5 seconds',focus:'zLazy'}),
+  PY('Join, group by department, time it','t = time.time()\njoined = skewed.join(hosts, "host").groupBy("dept").agg(_sum("bytes"))\njoined.show()\nprint(f"skewed join: {time.time()-t:.1f}s")',async()=>{
+     V('joined','df'); plan('joined',[{t:'skewed'},{t:'Exchange',sub:'by host',wide:true},{t:'SortMergeJoin'},{t:'Exchange',sub:'by dept',wide:true},{t:'sum'},{t:'show()',action:true}]);
+     renderAll(); await wait(400); S.mode='busy'; await runPlan(); setVar('joined','ran');
+     const tasks=taskSet(8,0.62,3,5.1,.4); const med=[...tasks].sort((a,b)=>a-b)[4];
+     stages('Sort-merge join: host007 lands in one task',[{id:12,ops:'scan skewed.json',tasks:[1.9]},{id:13,ops:'scan hosts',tasks:[0.2]},{id:14,ops:'SortMergeJoin + partial sum (8 partitions)',tasks,hot:true},{id:15,ops:'final sum by dept',tasks:[0.1]}],[null,{label:'hashpartitioning(host, 8)',bytes:'11.8 MiB'},{label:'hashpartitioning(dept, 8)',bytes:'2.1 KiB'}],`Task duration in the join stage: median <b>${med.toFixed(1)} s</b>, max <b>${Math.max(...tasks).toFixed(1)} s</b>. The task holding host007 (about 602,000 rows) does almost all the work.`);
+     out('+-----+------------+\n| dept|  sum(bytes)|\n+-----+------------+\n'+DEPT.map(([d,v])=>`|${d}|${String(v).padStart(12)}|`).join('\n')+'\n+-----+------------+\n\nskewed join: 8.4s'); S.mode='py';
+     S.score.joins.smj={time:8.4,ratio:`${(Math.max(...tasks)/med).toFixed(0)}× (max ${Math.max(...tasks).toFixed(1)} s, median ${med.toFixed(1)} s)`}; },
+   {simple:'Joins each event to its host\'s department, then adds up bytes per department.',what:'A sort-merge join shuffles both sides by <code>host</code> so matching rows meet in the same partition. All of host007\'s rows hash to the same partition, so one task gets about 60% of everything. In the Spark UI, open this stage\'s Summary Metrics and compare Duration at the 25th percentile, median and max.',see:'dept2 (which contains host007) has 170,080,710,984 bytes, about eight times each other department. One task bar is long and red.',vm:'about 8 seconds',focus:'zStages'})]
+  ,take:['A join puts every row with the same key in the same task, so one hot key means one overloaded task.','The stage waits for its slowest task; the max/median duration gap is the skew.']},
+ {title:'Fix it with a broadcast join',short:'broadcast',intro:'Copy the small table to every executor: no shuffle of the big side, so no skew.',cmds:[
+  PY('Broadcast the host table','from pyspark.sql.functions import broadcast\n\nt = time.time()\njoined_b = skewed.join(broadcast(hosts), "host").groupBy("dept").agg(_sum("bytes"))\njoined_b.show()\nprint(f"broadcast join: {time.time()-t:.1f}s")\n\njoined_b.explain()',async()=>{
+     V('joined_b','df'); plan('joined_b',[{t:'skewed',sub:'stays where it is'},{t:'BroadcastHashJoin',sub:'hosts copied to every task'},{t:'partial sum'},{t:'Exchange',sub:'by dept (tiny)',wide:true},{t:'sum'},{t:'show()',action:true}]);
+     renderAll(); await wait(400); S.mode='busy'; await runPlan(); setVar('joined_b','ran');
+     stages('Broadcast join: no shuffle on the big side',[{id:17,ops:'collect hosts (200 rows)',tasks:[0.2]},{id:18,ops:'scan skewed + BroadcastHashJoin + partial sum',tasks:[2.1]},{id:19,ops:'final sum by dept',tasks:[0.1]}],[{label:'200 rows to every task',bytes:'about 9 KiB',kind:'bc'},{label:'hashpartitioning(dept, 8)',bytes:'0.3 KiB'}],'The large side never moves, so there is no partition for host007 to overload.');
+     const phys="== Physical Plan ==\nAdaptiveSparkPlan isFinalPlan=false\n+- HashAggregate(keys=[dept#98], functions=[sum(bytes#80L)])\n   +- Exchange hashpartitioning(dept#98, 8), ENSURE_REQUIREMENTS, [plan_id=301]\n      +- HashAggregate(keys=[dept#98], functions=[partial_sum(bytes#80L)])\n         +- Project [bytes#80L, dept#98]\n            +- BroadcastHashJoin [host#81], [host#96], Inner, BuildRight, false\n               :- Filter isnotnull(host#81)\n               :  +- FileScan json [bytes#80L,host#81] ... ReadSchema: struct<bytes:bigint,host:string>\n               +- BroadcastExchange HashedRelationBroadcastMode(List(input[0, string, false]),false), [plan_id=297]\n                  +- Filter isnotnull(host#96)\n                     +- Scan ExistingRDD[host#96,kind#97,dept#98]";
+     out('+-----+------------+\n| dept|  sum(bytes)|\n+-----+------------+\n'+DEPT.map(([d,v])=>`|${d}|${String(v).padStart(12)}|`).join('\n')+'\n+-----+------------+\n\nbroadcast join: 2.6s\n'+phys); S.mode='py';
+     S.planText={title:'BroadcastHashJoin, and no Exchange under the big side',html:esc(phys).replace(/(BroadcastHashJoin[^\n]*)/,'<span class="g">$1</span>').replace(/(BroadcastExchange[^\n]*)/,'<span class="g">$1</span>')};
+     S.score.joins.bc={time:2.6,ratio:'no shuffle, no skew'}; },
+   {simple:'Tells Spark to send the 200-row table to every worker, so each one can join its own events locally.',what:'<code>broadcast()</code> is a hint that overrides the size estimate (and the threshold we turned off). In the plan, <strong>BroadcastHashJoin</strong> replaces SortMergeJoin, and the only Exchange is the tiny one by department.',see:'Identical department totals in about 2.6 seconds against 8.4.',vm:'about 3 seconds',focus:'zScore'})]
+  ,take:['When one side of a join is small, broadcast it: no shuffle of the big side, no skew.','Spark does this automatically below 10 MB; writing broadcast() makes the intent explicit and survives a bad estimate.']},
+ {title:'Fix it with salting',short:'salting',intro:'When both sides are big: split the hot key into 8 sub-keys.',cmds:[
+  PY('Salt the big side, replicate the small side, join','from pyspark.sql.functions import concat_ws, lit, floor, rand, explode, array, col\n\nSALT = 8\n\nbig_salted = skewed.withColumn("salt", floor(rand(42) * SALT).cast("int")) \\\n                   .withColumn("join_key", concat_ws("#", col("host"), col("salt")))\n\nsmall_salted = (hosts\n    .withColumn("salt", explode(array(*[lit(i) for i in range(SALT)])))\n    .withColumn("join_key", concat_ws("#", col("host"), col("salt")))\n    .drop("host"))\n\nt = time.time()\njoined_s = big_salted.join(small_salted, "join_key").groupBy("dept").agg(_sum("bytes"))\njoined_s.show()\nprint(f"salted join: {time.time()-t:.1f}s")',async()=>{
+     V('big_salted','df'); V('small_salted','df'); V('joined_s','df'); plan('joined_s',[{t:'skewed + salt 0..7',sub:'host007 → host007#0 … #7'},{t:'hosts × 8',sub:'1,600 rows'},{t:'Exchange',sub:'by join_key',wide:true},{t:'SortMergeJoin'},{t:'sum'},{t:'show()',action:true}]);
+     renderAll(); await wait(400); S.mode='busy'; await runPlan(); ['big_salted','small_salted','joined_s'].forEach(x=>setVar(x,'ran'));
+     const tasks=taskSet(8,0.95,2,1.6,.35); const med=[...tasks].sort((a,b)=>a-b)[4];
+     stages('Salted join: host007 spread over 8 keys',[{id:21,ops:'scan skewed + add salt',tasks:[2.0]},{id:22,ops:'hosts × 8 salts',tasks:[0.2]},{id:23,ops:'SortMergeJoin on join_key + partial sum',tasks,hot:false},{id:24,ops:'final sum by dept',tasks:[0.1]}],[null,{label:'hashpartitioning(join_key, 8)',bytes:'13.0 MiB'},{label:'hashpartitioning(dept, 8)',bytes:'2.2 KiB'}],`Join stage: median <b>${med.toFixed(1)} s</b>, max <b>${Math.max(...tasks).toFixed(1)} s</b>. Much more even. (Two salt values can still hash to the same partition, so it is rarely perfectly flat.)`);
+     out('+-----+------------+\n| dept|  sum(bytes)|\n+-----+------------+\n'+DEPT.map(([d,v])=>`|${d}|${String(v).padStart(12)}|`).join('\n')+'\n+-----+------------+\n\nsalted join: 4.7s'); S.mode='py';
+     S.score.joins.salt={time:4.7,ratio:`${(Math.max(...tasks)/med).toFixed(1)}× (max ${Math.max(...tasks).toFixed(1)} s, median ${med.toFixed(1)} s)`}; },
+   {simple:'Gives every big-side row a random number 0 to 7 and joins on "host#number". Every small-side row is copied 8 times, once per number, so every big row still finds its match.',what:'<code>rand(42) * 8</code>, floored, is the salt; <code>concat_ws("#", …)</code> builds keys like <code>host007#3</code>. On the small side, <code>explode(array(0…7))</code> makes 8 copies of each host (200 × 8 = 1,600 rows). host007\'s 602,000 rows become 8 keys of about 75,000 each, spread across tasks. More code, but it works when neither side can be broadcast.',see:'The same department totals, with a much flatter task bar chart.',vm:'about 5 seconds',focus:'zStages'})]
+  ,take:['Salting splits a hot key across several tasks; the small side must be replicated across every salt value, or rows go missing.','Check that the totals match the unsalted join: they are the proof it is correct.']},
+ {title:'Cache, and measure whether it helped',short:'cache',intro:'Cache a DataFrame you reuse, and measure.',cmds:[
+  PY('Time it uncached, then cached','agg2 = df.groupBy("host", "action").agg(_count("*").alias("n"))\n\nt = time.time(); agg2.count(); print(f"uncached first : {time.time()-t:.1f}s")\nt = time.time(); agg2.count(); print(f"uncached second: {time.time()-t:.1f}s")\n\nagg2.cache(); agg2.count()\nt = time.time(); agg2.count(); print(f"cached         : {time.time()-t:.1f}s")',async()=>{
+     V('agg2','df'); plan('agg2',[{t:'df (scan json)'},{t:'groupBy host, action',wide:true},{t:'count()',action:true}]);
+     S.mode='busy'; renderAll(); await runPlan(); out('uncached first : 6.9s'); await wait(400); out('uncached second: 5.8s'); await wait(400); setVar('agg2','cached'); out('cached         : 0.2s'); S.mode='py';
+     stages('After cache(): reading 1,000 rows from memory',[{id:31,ops:'InMemoryTableScan agg2 (1,000 rows)',tasks:[0.1]}],[],'Spark UI, Storage tab: <b>agg2</b>, 1 partition cached, <b>100%</b> fraction cached, about 34 KiB in memory.');
+     S.score.cache=['6.9','5.8','0.2']; },
+   {simple:'Counts a small summary table three times: twice without caching, once after caching it in memory.',what:'Without a cache, every count re-reads and re-parses the whole JSON. <code>cache()</code> is lazy: it only marks the DataFrame, and the first <code>count()</code> after it fills the cache. Only then is the next count fast. The second uncached run is a little faster than the first because the operating system has the file in its own cache.',see:'6.9 s, 5.8 s, then 0.2 s. agg2 turns amber (cached).',vm:'about 15 seconds',focus:'zScore'}),
+  PY('Check the Storage tab, then release it','# Spark UI > Storage tab: check the size in memory and the fraction cached\nagg2.unpersist()',()=>{ setVar('agg2','ran'); },{simple:'Looks at what is cached, then frees the memory.',what:'If "Fraction Cached" is below 100%, part of the data did not fit and would be recomputed each time.',see:'agg2 is no longer cached.',vm:'instant',focus:'zLazy'})]
+  ,take:['cache() is lazy; an action fills it.','Cache only what you reuse, and measure: an unused cache wastes memory others could use.']},
+ {title:'Write the results out',short:'write',intro:'Write a partitioned Parquet result, read it back, and filter by date.',cmds:[
+  PY('Write partitioned Parquet','out = f"hdfs://localhost:9000/user/{spark.sparkContext.sparkUser()}/lab4/spark-out"\n\n(df.groupBy("event_date", "host")\n   .agg(_sum("bytes").alias("total_bytes"), _count("*").alias("events"))\n   .coalesce(4)\n   .write.mode("overwrite").partitionBy("event_date").parquet(out))',async()=>{
+     plan('write',[{t:'df'},{t:'groupBy date, host',wide:true},{t:'coalesce(4)',sub:'no shuffle'},{t:'write parquet',action:true,sub:'partitionBy event_date'}]);
+     S.mode='busy'; renderAll(); await runPlan(); S.mode='py'; addFile('hdfs:/user/hadoop/lab4/spark-out/event_date=2026-08-01/ … event_date=2026-08-21/   (21 folders)');
+     stages('Aggregate, then 4 writer tasks',[{id:33,ops:'scan + partial agg',tasks:taskSet(3,4.6,-1,0)},{id:34,ops:'final agg → coalesce(4) → write',tasks:taskSet(4,1.1,-1,0)}],[{label:'hashpartitioning(event_date, host, 8)',bytes:'98 KiB'}],'coalesce(4) merged 8 partitions into 4 without another shuffle; each writer task writes one file into each date folder it has rows for.'); },
+   {simple:'Totals bytes and events per host per day, and writes them as Parquet with one folder per date.',what:'<code>coalesce(4)</code> merges partitions without a shuffle, so you get fewer, larger files. It can only reduce the number; <code>repartition(n)</code> can increase it, but shuffles. <code>partitionBy("event_date")</code> makes a folder per date, like the Hive table in lab 3.2.',see:'A spark-out folder with one sub-folder per date.',vm:'about 10 seconds',focus:'zMachine',fix:'Expect <strong>21</strong> date folders, not twenty: the extra one, 2026-08-21, holds the single event at midnight that lab 3.1\'s generator can produce. And because coalesce(4) does not group rows by date, each date folder can get up to 4 files (one per writer task).'}),
+  PY('Read it back and filter one day','back = spark.read.parquet(out)\nback.count()\nback.filter("event_date = \'2026-08-05\'").orderBy("total_bytes", ascending=False).show(5)',async()=>{ V('back','df','ran'); S.mode='busy'; await wait(700); out('4001'); out('+-------+-----------+------+----------+\n|   host|total_bytes|events|event_date|\n+-------+-----------+------+----------+\n'+D5TOP.map(([h,b,e])=>`|${h}|  ${b}|   ${e}|2026-08-05|`).join('\n')+'\n+-------+-----------+------+----------+'); S.mode='py';
+     S.planText={title:'Partition pruning in the read',html:esc('FileScan parquet [host#140,total_bytes#141L,events#142L,event_date#143] … PartitionFilters: [isnotnull(event_date#143), (event_date#143 = 2026-08-05)] …').replace(/(PartitionFilters: \[[^\]]*\])/,'<span class="g">$1</span>')}; },
+   {simple:'Reads the result back, counts the rows, and shows the five busiest hosts on 5 August.',what:'Run <code>.explain()</code> on the filtered DataFrame and look for <strong>PartitionFilters</strong>: only the 2026-08-05 folder is read.',see:'4,001 rows (20 days × 200 hosts, plus 1 for 21 August). Top on 5 August: host046 with 141,524,198 bytes.',vm:'about 5 seconds',focus:'zStages'})]
+  ,take:['coalesce reduces partitions without a shuffle; repartition can increase them but shuffles.','A partitioned write lets later reads skip whole folders.']},
+ {title:'Write up the comparison',short:'comparison',intro:'Fill in the table, then stop everything.',cmds:[
+  PY('Leave PySpark first',`spark.stop()\nexit()`,()=>{ S.mode='shell'; S.spark=false; rmProc('ss'); },{simple:'Stops the Spark session and leaves the Python shell.',what:'The sheet runs these at the end; leaving first lets you run the shell commands below in the same terminal.',see:'The prompt returns to bash.',vm:'a few seconds',focus:'zMachine'}),
+  C({label:'Count the Java from lab 4.1',code:'wc -l ~/lab4/src/*.java | tail -1',run:()=>out('  106 total'),simple:'Counts all the Java lines you wrote in lab 4.1.',what:'',see:'106 lines, including the 15-line partitioner. The three files that compute the sum are about 90.',vm:'instant',focus:'zScore',fix:'The sheet expects about 120. The lab 4.1 sources are 91 lines for the mapper, reducer and driver (with the one-line fix), and 106 with the partitioner. Either way, the comparison with 5 and 2 lines makes the point.'}),
+  C({label:'Stop HDFS',code:'stop-dfs.sh',run:()=>{ out('Stopping namenodes on [localhost]\nStopping datanodes\nStopping secondary namenodes [ubuntuOS]'); ['NameNode','DataNode','SecondaryNameNode'].forEach(rmProc); S.hdfs=false; },simple:'Turns off HDFS.',what:'',see:'No processes left. Your table is in the scoreboard.',vm:'about 10 seconds',focus:'zScore'})]
+  ,take:['DataFrames are shorter and faster because they describe intent rather than procedure.']}
+];
+
+/* ================= step UI ================= */
+let cur=0;
+const done=STEPS.map(s=>s.cmds.map(()=>false));
+const stepDone=i=>done[i].every(Boolean);
+function nextCmd(){ for(let i=0;i<STEPS.length;i++) for(let j=0;j<STEPS[i].cmds.length;j++) if(!done[i][j]) return [i,j]; return null; }
+function renderRail(){ $('#rail').innerHTML=STEPS.map((s,i)=>`<button role="tab" aria-selected="${i===cur}" class="${i===cur?'cur':''} ${stepDone(i)?'done':''}" data-i="${i}"><b>${i+1}</b>${s.short}</button>`).join(''); }
+$('#rail').addEventListener('click',e=>{ const b=e.target.closest('button[data-i]'); if(!b) return; cur=+b.dataset.i; renderStep(); renderRail(); });
+function renderStep(){
+  const s=STEPS[cur], nx=nextCmd();
+  let h=`<div class="step-head"><h2>Step ${cur+1}. ${s.title}</h2><p class="mb-2">${s.intro}</p></div>`;
+  if(nx && nx[0]<cur) h+=`<div class="ff-box"><p class="mb-2">Earlier steps have not been run yet. Run them yourself, or let the simulator run them quickly.</p><button class="btn btn-hot btn-sm" id="ffBtn">Run steps ${nx[0]+1} to ${cur} for me</button></div>`;
+  h+='<div class="cmd-list" id="cmdList">';
+  s.cmds.forEach((c,j)=>{ const isNext=nx&&nx[0]===cur&&nx[1]===j, isDone=done[cur][j];
+    h+=`<div class="cmd ${isDone?'done':''} ${isNext?'next':''}" id="cmd${j}"><div class="cmd-top"><span class="where ${c.py?'py':'sh'}">${c.py?'&gt;&gt;&gt; python':'$ bash'}</span>${c.extra?'<span class="extra">extra, not on the sheet</span>':''}<span class="cmd-label">${c.label}</span><span class="status">${isDone?'done':''}</span><button class="btn btn-sm ${isNext?'btn-hot':'btn-soft'} run" data-j="${j}" ${isNext&&!S.busy?'':'disabled'}>${isDone?'Ran':c.code.startsWith('#')?'Show':'Run'}</button></div><pre>${esc(c.code)}</pre>
+    ${isDone?`<div class="cmd-explain"><p class="simple"><strong>In plain words:</strong> ${c.simple}</p>${c.what?`<p>${c.what}</p>`:''}<p class="see">What changed: ${c.see}</p>${c.fix?`<p class="fix mb-2"><strong>Note on the lab sheet:</strong> ${c.fix}</p>`:''}<p class="vm mb-0">On the VM this takes ${c.vm}.</p></div>`:''}</div>`; });
+  if(nx && nx[0]===cur && s.cmds.length-nx[1]>1) h+=`<button class="btn btn-soft btn-sm mb-2" id="runRest" ${S.busy?'disabled':''}>Run the rest of this step</button>`;
+  if(stepDone(cur)) h+=`<div class="step-takeaway"><div class="panel-title mb-1">What this step taught</div><ul>${s.take.map(t=>`<li>${t}</li>`).join('')}</ul>${cur<STEPS.length-1?`<button class="btn btn-hot btn-sm mt-2" id="nextStep">Go to step ${cur+2}</button>`:`<a class="btn btn-hot btn-sm mt-2" href="#conclusion">Read what the lab teaches</a>`}</div>`;
+  h+='</div>'; $('#stepPane').innerHTML=h;
+  const list=$('#cmdList'), tgt=list&&(list.querySelector('.cmd.next')||list.querySelector('.step-takeaway')); if(list&&tgt) list.scrollTop=Math.max(0,tgt.offsetTop-list.offsetTop-8);
+}
+$('#stepPane').addEventListener('click',async e=>{
+  const r=e.target.closest('button.run'); if(r&&!r.disabled){ await runCmd(cur,+r.dataset.j,false); return; }
+  if(e.target.id==='nextStep'){ cur++; renderStep(); renderRail(); $('#sim').scrollIntoView(); return; }
+  if(e.target.id==='runRest'){ const nx=nextCmd(); for(let j=nx[1];j<STEPS[cur].cmds.length;j++) await runCmd(cur,j,false); return; }
+  if(e.target.id==='ffBtn') await fastForward(cur);
+});
+function focusZones(id){ ['zMachine','zLazy','zStages','zScore'].forEach(z=>$('#'+z).classList.toggle('focus',z===id)); const sys=$('#sys'); if(getComputedStyle(sys).position==='sticky'){ const el=$('#'+id); sys.scrollTo({top:Math.max(0,el.offsetTop-52),behavior:reduceMotion?'auto':'smooth'}); } }
+async function runCmd(i,j,fast){
+  if(S.busy) return; const c=STEPS[i].cmds[j]; S.busy=true; jump=true;
+  if(!c.code.startsWith('# http')) echo(c.code);
+  focusZones(c.focus||'zMachine'); if(!fast) renderStep();
+  try{ await c.run(fast); } catch(err){ console.error(err); out('(simulator error: '+err.message+')','err'); }
+  done[i][j]=true; S.busy=false; termDirty=true;
+  if(!fast){ renderStep(); renderRail(); renderAll(); }
+}
+async function fastForward(upTo){ fastMode=true; const b=$('#ffBtn'); if(b){ b.disabled=true; b.textContent='Running…'; } let nx; while((nx=nextCmd())&&nx[0]<upTo) await runCmd(nx[0],nx[1],true); fastMode=false; renderStep(); renderRail(); renderAll(); }
+window.__sim={S,STEPS,nextCmd,done};
+renderRail(); renderStep(); renderAll();
+})();
+</script>
+</body>
+</html>
